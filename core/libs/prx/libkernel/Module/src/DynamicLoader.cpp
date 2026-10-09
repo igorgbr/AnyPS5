@@ -60,8 +60,12 @@ std::uintptr_t MainProgramBase() {
         ::dl_iterate_phdr(
             [](dl_phdr_info* info, size_t, void* data) {
                 auto* found = static_cast<Scan*>(data);
-                if (found->value == 0 && info->dlpi_name != nullptr && info->dlpi_name[0] == '\0') found->value = info->dlpi_addr;
-                return found->value == 0 ? 0 : 1;
+                if (info->dlpi_name == nullptr || info->dlpi_name[0] != '\0') return 0;
+                auto lowest = UINTPTR_MAX;
+                for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i)
+                    if (info->dlpi_phdr[i].p_type == PT_LOAD && info->dlpi_phdr[i].p_vaddr < lowest) lowest = info->dlpi_phdr[i].p_vaddr;
+                found->value = info->dlpi_addr + lowest;
+                return 1;
             },
             &scan);
         return scan.value;
